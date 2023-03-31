@@ -2,6 +2,7 @@ pub mod k8s;
 
 const RETRIES: u32 = 25;
 const BACKOFF_STEP: std::time::Duration = std::time::Duration::from_millis(250);
+const MAX_DELAY: std::time::Duration = std::time::Duration::from_secs(4);
 
 /// The available xDS source providers.
 #[derive(Clone, Debug, clap::Subcommand)]
@@ -47,9 +48,11 @@ impl Providers {
                 gameservers_namespace,
                 config_namespace,
             } => tokio::spawn(Self::task({
+                tracing::info!("GOALS watching agones soon");
                 let gameservers_namespace = gameservers_namespace.clone();
                 let config_namespace = config_namespace.clone();
                 move || {
+                    tracing::info!("GOALS watching agones");
                     crate::config::watch::agones(
                         gameservers_namespace.clone(),
                         config_namespace.clone(),
@@ -73,7 +76,9 @@ impl Providers {
         tryhard::retry_fn(task)
             .retries(RETRIES)
             .exponential_backoff(BACKOFF_STEP)
+            .max_delay(MAX_DELAY)
             .on_retry(|attempt, _, error: &eyre::Error| {
+                tracing::info!(%attempt, "GOALS on_retry called");
                 let error = error.to_string();
                 async move {
                     tracing::warn!(%attempt, %error, "provider task error, retrying");
