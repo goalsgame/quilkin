@@ -130,7 +130,13 @@ pub fn update_endpoints_from_gameservers(
                 }
 
                 Event::Deleted(server) => {
-                    let endpoint = Endpoint::try_from(server)?;
+                    let endpoint = match Endpoint::try_from(server) {
+                        Ok(endpoint) => endpoint,
+                        Err(error) => {
+                            tracing::warn!(%error, "GOALS received invalid gameserver to delete from k8s, skipping");
+                            continue
+                        }
+                    };
                     tracing::trace!(?endpoint, "Deleting endpoint");
                     config.clusters.modify(|clusters| {
                         for locality in clusters.default_cluster_mut().localities.iter_mut() {
